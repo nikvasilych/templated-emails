@@ -34,7 +34,7 @@ def get_email_directories(dir):
 
 def send_templated_email(recipients, template_path, context=None,
                     from_email=settings.DEFAULT_FROM_EMAIL,
-                    fail_silently=False):
+                    fail_silently=False, send_immediately=True):
     """
         recipients can be either a list of emails or a list of users,
         if it is users the system will change to the language that the
@@ -44,11 +44,11 @@ def send_templated_email(recipients, template_path, context=None,
     recipient_emails = [e for e in recipients if not isinstance(e, User)]
     send = _send_task.delay if use_celery else _send
     send(recipient_pks, recipient_emails, template_path, context, from_email,
-         fail_silently)
+         fail_silently, send_immediately=send_immediately)
 
 
 def _send(recipient_pks, recipient_emails, template_path, context, from_email,
-          fail_silently):
+          fail_silently, send_immediately=True):
     recipients = list(User.objects.filter(pk__in=recipient_pks))
     recipients += recipient_emails
 
@@ -99,12 +99,16 @@ def _send(recipient_pks, recipient_emails, template_path, context, from_email,
             msg.attach_alternative(body, "text/html")
         except TemplateDoesNotExist:
             logging.info("Email sent without HTML, since %s not found" % html_path)
-
-        msg.send(fail_silently=fail_silently)
+        
+        if send_immediately:
+            msg.send(fail_silently=fail_silently)
 
         # reset environment to original language
         if isinstance(recipient, User):
             activate(current_language)
+            
+        return msg
+        
 if use_celery:
     _send_task = task(_send)
 
