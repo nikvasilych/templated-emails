@@ -107,7 +107,7 @@ def _send(recipient_pks, recipient_emails, template_path, context, from_email,
         if isinstance(recipient, User):
             activate(current_language)
             
-    return msg
+        yield msg
         
 if use_celery:
     _send_task = task(_send)
