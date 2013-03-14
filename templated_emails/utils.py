@@ -43,8 +43,8 @@ def send_templated_email(recipients, template_path, context=None,
     recipient_pks = [r.pk for r in recipients if isinstance(r, User)]
     recipient_emails = [e for e in recipients if not isinstance(e, User)]
     send = _send_task.delay if use_celery else _send
-    return send(recipient_pks, recipient_emails, template_path, context, from_email,
-         fail_silently, send_immediately=send_immediately)
+    return list(send(recipient_pks, recipient_emails, template_path, context, from_email,
+         fail_silently, send_immediately=send_immediately))
 
 
 def _send(recipient_pks, recipient_emails, template_path, context, from_email,
