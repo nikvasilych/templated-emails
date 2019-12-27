@@ -24,21 +24,21 @@ test_replace_string = """<html>{% block test123 %}{% endblock %}</html>"""
 
 class BlockExtraction(TestCase):
     def test_extraction(self):
-        self.assertEquals("""tr
+        self.assertEqual("""tr
  st
 
  sdf""", parse_string_blocks(test_extraction_string, {})["test"])
 
-        self.assertEquals("tr s123t sdf", parse_string_blocks(test_extraction_string2, {})["test123"])
+        self.assertEqual("tr s123t sdf", parse_string_blocks(test_extraction_string2, {})["test123"])
         data = parse_string_blocks(test_extraction_string3, {})
-        self.assertEquals("""
+        self.assertEqual("""
             tr s123t sdf
 """,data["test123"])
-        self.assertEquals("""test""",data["test"])
+        self.assertEqual("""test""",data["test"])
 
     def test_full_extraction(self):
         data = parse_string_blocks(test_extraction_string4, {})
-        print data
+        print(data)
         self.assertTrue(data.get("message_title", False))
         self.assertTrue(data.get("email_notification", False))
         self.assertTrue(data.get("email_title", False))

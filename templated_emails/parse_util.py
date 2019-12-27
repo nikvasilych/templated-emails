@@ -80,7 +80,7 @@ def parse_string_blocks(string, data):
                        re.DOTALL|re.MULTILINE|re.IGNORECASE)
     m = regex.findall(string)
     for item in m:
-        print item[0]
+        print(item[0])
         data[item[0]] = item[1]
     return data
 
