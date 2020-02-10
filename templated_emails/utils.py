@@ -15,6 +15,8 @@ try:
 except ImportError:
     task = lambda f: f
 
+from django.db import transaction
+
 use_celery = getattr(settings, 'TEMPLATEDEMAILS_USE_CELERY', False)
 
 
@@ -34,7 +36,7 @@ def get_email_directories(dir):
 
 def send_templated_email(recipients, template_path, context=None,
                     from_email=settings.DEFAULT_FROM_EMAIL,
-                    fail_silently=False, send_immediately=True):
+                    fail_silently=False, **extra_kwargs):
     """
         recipients can be either a list of emails or a list of users,
         if it is users the system will change to the language that the
@@ -42,13 +44,16 @@ def send_templated_email(recipients, template_path, context=None,
     """
     recipient_pks = [r.pk for r in recipients if isinstance(r, User)]
     recipient_emails = [e for e in recipients if not isinstance(e, User)]
-    send = _send_task.delay if use_celery else _send
-    return list(send(recipient_pks, recipient_emails, template_path, context, from_email,
-         fail_silently, send_immediately=send_immediately))
+    if use_celery:
+        transaction.on_commit(
+            lambda: _send_task.delay(recipient_pks, recipient_emails, template_path, context, from_email, fail_silently, **extra_kwargs)
+        )
+    else:
+        _send(recipient_pks, recipient_emails, template_path, context, from_email, fail_silently, **extra_kwargs)
 
 
 def _send(recipient_pks, recipient_emails, template_path, context, from_email,
-          fail_silently, send_immediately=True):
+          fail_silently, **extra_kwargs):
     recipients = list(User.objects.filter(pk__in=recipient_pks))
     recipients += recipient_emails
 
@@ -79,7 +84,8 @@ def _send(recipient_pks, recipient_emails, template_path, context, from_email,
             email = recipient
 
         # populate per-recipient context
-        #context = Context(default_context)
+        # context = Context(default_context)
+        context = default_context
         context['recipient'] = recipient
         context['email'] = email
 
@@ -88,7 +94,7 @@ def _send(recipient_pks, recipient_emails, template_path, context, from_email,
         subject = "".join(subject.splitlines())  # this must be a single line
         text = render_to_string(text_path, context)
 
-        msg = EmailMultiAlternatives(subject, text, from_email, [email])
+        msg = EmailMultiAlternatives(subject, text, from_email, [email], **extra_kwargs)
 
         # try to attach the html variant
         try:
@@ -100,15 +106,12 @@ def _send(recipient_pks, recipient_emails, template_path, context, from_email,
         except TemplateDoesNotExist:
             logging.info("Email sent without HTML, since %s not found" % html_path)
         
-        if send_immediately:
-            msg.send(fail_silently=fail_silently)
+        msg.send(fail_silently=fail_silently)
 
         # reset environment to original language
         if isinstance(recipient, User):
             activate(current_language)
-            
-        yield msg
-        
+
 if use_celery:
     _send_task = task(_send)
 
